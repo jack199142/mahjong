@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>麻將排桌避開小幫手（自動記憶版）</title>
+    <title>麻將排桌智慧小幫手</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -70,7 +70,7 @@
             margin-top: 15px;
             border-radius: 0 4px 4px 0;
         }
-        .error-box {
+        .warning-box {
             background: #fdebd0;
             border-left: 5px solid #e67e22;
             padding: 15px;
@@ -80,9 +80,15 @@
         .table-card {
             background: #fff;
             border: 1px solid #ddd;
-            padding: 10px 15px;
+            padding: 12px 15px;
             margin-bottom: 10px;
             border-radius: 4px;
+        }
+        .conflict-tag {
+            color: #c0392b;
+            font-size: 13px;
+            margin-top: 5px;
+            font-weight: bold;
         }
         .save-tip {
             font-size: 12px;
@@ -93,7 +99,7 @@
 </head>
 <body>
 
-    <h1>🀄 麻將排桌避開小幫手</h1>
+    <h1>🀄 麻將排桌智慧小幫手</h1>
 
     <div class="card">
         <h3>1. 輸入今日出席名單</h3>
@@ -107,11 +113,11 @@
         <textarea id="conflicts" placeholder="例如：
 小明: 小華, 大強
 美美: 阿傑"></textarea>
-        <div class="save-tip">💡 提示：互斥名單會自動儲存在這個瀏覽器中，下次打開不用重新輸入！</div>
+        <div class="save-tip">💡 提示：互斥名單會自動儲存在這個瀏覽器中！</div>
     </div>
 
     <div class="btn-group">
-        <button onclick="generateTables()">開始自動排桌</button>
+        <button onclick="generateTables()">開始智慧排桌</button>
         <button class="secondary" onclick="saveDataManually()">手動儲存設定</button>
     </div>
 
@@ -120,21 +126,15 @@
     <script>
         window.onload = function() {
             const savedConflicts = localStorage.getItem('mahjong_conflicts');
-            if (savedConflicts) {
-                document.getElementById('conflicts').value = savedConflicts;
-            }
+            if (savedConflicts) document.getElementById('conflicts').value = savedConflicts;
             const savedPlayers = localStorage.getItem('mahjong_players');
-            if (savedPlayers) {
-                document.getElementById('players').value = savedPlayers;
-            }
+            if (savedPlayers) document.getElementById('players').value = savedPlayers;
         };
 
         function saveDataManually() {
-            const conflictsText = document.getElementById('conflicts').value;
-            const playersText = document.getElementById('players').value;
-            localStorage.setItem('mahjong_conflicts', conflictsText);
-            localStorage.setItem('mahjong_players', playersText);
-            alert('✅ 互斥名單與出席名單已成功儲存！');
+            localStorage.setItem('mahjong_conflicts', document.getElementById('conflicts').value);
+            localStorage.setItem('mahjong_players', document.getElementById('players').value);
+            alert('✅ 設定已成功儲存！');
         }
 
         function parseConflicts(text) {
@@ -157,40 +157,30 @@
             return conflictMap;
         }
 
-        function isValidTable(table, conflictMap) {
+        // 計算單桌內的衝突次數與細節
+        function getTableConflicts(table, conflictMap) {
+            let count = 0;
+            let details = [];
             for (let i = 0; i < table.length; i++) {
                 for (let j = i + 1; j < table.length; j++) {
                     const p1 = table[i];
                     const p2 = table[j];
                     if (conflictMap[p1] && conflictMap[p1].has(p2)) {
-                        return false;
+                        count++;
+                        details.push(`${p1} 與 ${p2}`);
                     }
                 }
             }
-            return true;
+            return { count, details };
         }
 
-        function findCombination(remainingPlayers, currentTables, conflictMap) {
-            if (remainingPlayers.length === 0) {
-                return currentTables;
-            }
-            if (remainingPlayers.length < 4) {
-                return null; 
-            }
-
-            const first = remainingPlayers[0];
-            const rest = remainingPlayers.slice(1);
-            const combinations = getCombinations(rest, 3);
-            
-            for (let combo of combinations) {
-                const table = [first, ...combo];
-                if (isValidTable(table, conflictMap)) {
-                    const nextRemaining = rest.filter(p => !combo.includes(p));
-                    const result = findCombination(nextRemaining, [...currentTables, table], conflictMap);
-                    if (result) return result;
-                }
-            }
-            return null;
+        // 計算整組分桌方案的總衝突分（越低越好）
+        function evaluateAllocation(tables, conflictMap) {
+            let totalConflicts = 0;
+            tables.forEach(table => {
+                totalConflicts += getTableConflicts(table, conflictMap).count;
+            });
+            return totalConflicts;
         }
 
         function getCombinations(arr, k) {
@@ -203,6 +193,45 @@
             return [...withHead, ...withoutHead];
         }
 
+        // 尋找最佳分桌（優先找 0 衝突，找不到則找衝突最少的方案）
+        function findBestAllocation(players, conflictMap) {
+            let numTables = Math.floor(players.length / 4);
+            if (numTables === 0) return { tables: [], rest: players, score: 999 };
+
+            let bestTables = null;
+            let bestRest = [];
+            let minConflicts = 9999;
+
+            // 隨機抽樣或窮舉組合來尋找最佳解
+            function search(currentPlayers, currentTables, depth) {
+                if (depth === numTables || currentPlayers.length < 4) {
+                    let score = evaluateAllocation(currentTables, conflictMap);
+                    if (score < minConflicts) {
+                        minConflicts = score;
+                        bestTables = [...currentTables];
+                        bestRest = [...currentPlayers];
+                    }
+                    return;
+                }
+
+                const first = currentPlayers[0];
+                const rest = currentPlayers.slice(1);
+                const combos = getCombinations(rest, 3);
+
+                // 為了效能，限制最多檢查前 30 種組合
+                const limitCombos = combos.slice(0, 30);
+                for (let combo of limitCombos) {
+                    const table = [first, ...combo];
+                    const nextRemaining = rest.filter(p => !combo.includes(p));
+                    search(nextRemaining, [...currentTables, table], depth + 1);
+                    if (minConflicts === 0) break; // 找到完美解直接收工
+                }
+            }
+
+            search(players, [], 0);
+            return { tables: bestTables, rest: bestRest, score: minConflicts };
+        }
+
         function generateTables() {
             const playersText = document.getElementById('players').value;
             const conflictsText = document.getElementById('conflicts').value;
@@ -212,42 +241,39 @@
 
             const players = playersText.split(/[,，\s\n]+/).map(s => s.trim()).filter(s => s);
             const uniquePlayers = [...new Set(players)];
-
             const outputDiv = document.getElementById('output');
 
             if (uniquePlayers.length < 4) {
-                outputDiv.innerHTML = `
-                    <div class="error-box">
-                        <strong>人數不足：</strong> 至少需要 4 個人才能湊成一桌！
-                    </div>
-                `;
+                outputDiv.innerHTML = `<div class="warning-box"><strong>人數不足：</strong> 至少需要 4 個人才能排桌！</div>`;
                 return;
             }
 
             const conflictMap = parseConflicts(conflictsText);
-            const resultTables = findCombination(uniquePlayers, [], conflictMap);
+            const result = findBestAllocation(uniquePlayers, conflictMap);
 
-            if (resultTables && resultTables.length > 0) {
-                let html = `<div class="result-box"><h3>🎉 成功安排以下牌桌：</h3>`;
-                resultTables.forEach((table, index) => {
-                    html += `<div class="table-card"><strong>第 ${index + 1} 桌：</strong> ${table.join(', ')}</div>`;
-                });
-                
-                const seatedPlayers = resultTables.flat();
-                const restPlayers = uniquePlayers.filter(p => !seatedPlayers.includes(p));
-                if (restPlayers.length > 0) {
-                    html += `<div style="margin-top: 10px; color: #c0392b;"><strong>本輪落單/候補人員：</strong> ${restPlayers.join(', ')}</div>`;
-                }
-
-                html += `</div>`;
-                outputDiv.innerHTML = html;
+            let html = '';
+            if (result.score === 0) {
+                html += `<div class="result-box"><h3>🎉 完美排桌完成（完全無衝突）！</h3>`;
             } else {
-                outputDiv.innerHTML = `
-                    <div class="error-box">
-                        <strong>無法排出符合條件的組合！</strong> 可能是互斥條件太嚴格，導致彼此衝突。請嘗試調整或放寬部分避開名單。
-                    </div>
-                `;
+                html += `<div class="warning-box"><h3>⚠️ 已找出最佳排法（但有 ${result.score} 個無法避免的衝突）：</h3>`;
             }
+
+            result.tables.forEach((table, index) => {
+                const check = getTableConflicts(table, conflictMap);
+                html += `<div class="table-card">
+                    <strong>第 ${index + 1} 桌：</strong> ${table.join(', ')}`;
+                if (check.count > 0) {
+                    html += `<div class="conflict-tag">⚠️ 衝突注意：${check.details.join('、')} 同桌</div>`;
+                }
+                html += `</div>`;
+            });
+
+            if (result.rest.length > 0) {
+                html += `<div style="margin-top: 10px; color: #c0392b;"><strong>本輪落單/候補人員：</strong> ${result.rest.join(', ')}</div>`;
+            }
+
+            html += `</div>`;
+            outputDiv.innerHTML = html;
         }
     </script>
 </body>
