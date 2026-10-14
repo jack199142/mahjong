@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>麻將排桌智慧小幫手（含底台分類）</title>
+    <title>麻將排桌小幫手 - 客人資料庫與勾選排桌</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: #f4f6f9;
             color: #333;
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
             padding: 20px;
         }
-        h1 {
+        h1, h2 {
             text-align: center;
             color: #2c3e50;
         }
@@ -25,54 +25,81 @@
             margin-bottom: 20px;
         }
         label {
-            display: block;
-            margin-top: 10px;
             font-weight: bold;
+            display: inline-block;
+            margin-bottom: 5px;
         }
-        textarea {
+        input[type="text"] {
             width: 100%;
-            padding: 10px;
-            margin-top: 5px;
+            padding: 8px;
+            margin-bottom: 10px;
             border: 1px solid #ccc;
             border-radius: 4px;
             box-sizing: border-box;
-            height: 100px;
-            resize: vertical;
         }
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+        .player-checkbox {
+            background: #eef2f5;
+            padding: 8px 12px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .player-checkbox:hover {
+            background: #e2e8f0;
+        }
+        .tag {
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: #3498db;
+            color: white;
+        }
+        button {
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            font-size: 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover { background-color: #219653; }
+        button.secondary { background-color: #7f8c8d; }
+        button.secondary:hover { background-color: #707b7c; }
+        button.danger { background-color: #e74c3c; padding: 4px 8px; font-size: 12px; }
+        button.danger:hover { background-color: #c0392b; }
+        
         .btn-group {
             display: flex;
             gap: 10px;
             margin-top: 15px;
         }
-        button {
-            flex: 1;
-            background-color: #27ae60;
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            font-size: 16px;
-            border-radius: 4px;
-            cursor: pointer;
+        .customer-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
         }
-        button:hover {
-            background-color: #219653;
+        .customer-table th, .customer-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            font-size: 14px;
         }
-        button.secondary {
-            background-color: #7f8c8d;
-        }
-        button.secondary:hover {
-            background-color: #707b7c;
+        .customer-table th {
+            background-color: #f2f2f2;
         }
         .result-box {
             background: #e8f8f5;
             border-left: 5px solid #27ae60;
-            padding: 15px;
-            margin-top: 15px;
-            border-radius: 0 4px 4px 0;
-        }
-        .warning-box {
-            background: #fdebd0;
-            border-left: 5px solid #e67e22;
             padding: 15px;
             margin-top: 15px;
             border-radius: 0 4px 4px 0;
@@ -99,79 +126,208 @@
             margin-top: 5px;
             font-weight: bold;
         }
-        .save-tip {
-            font-size: 12px;
-            color: #e67e22;
-            margin-top: 5px;
-        }
-        .format-tip {
-            font-size: 13px;
-            color: #666;
-            margin-top: 5px;
-            line-height: 1.4;
-        }
     </style>
 </head>
 <body>
 
-    <h1>🀄 麻將排桌智慧小幫手（底台分類版）</h1>
+    <h1>🀄 麻將排桌小幫手（顧客資料庫版）</h1>
 
+    <!-- 今天出席勾選區 -->
     <div class="card">
-        <h3>1. 輸入今日出席名單與底台</h3>
-        <label for="players">請輸入今天來的客人名字（格式：名字 [底台]，用逗號或換行隔開）：</label>
-        <textarea id="players" placeholder="例如：
-小明 [5/1], 小華 [5/1], 大強 [5/1], 美美 [5/1], 
-阿傑 [3/5], 志明 [3/5], 春嬌 [3/5], 麗華 [3/5]">小明 [5/1], 小華 [5/1], 大強 [5/1], 美美 [5/1], 阿傑 [3/5], 志明 [3/5], 春嬌 [3/5], 麗華 [3/5]</textarea>
-        <div class="format-tip">💡 提示：在名字後面加上中括號如 <code>[5/1]</code> 或 <code>[3/5]</code>，系統就會自動分組排桌！沒寫括號的人會被歸類在「一般/預設」組。</div>
+        <h3>1. 勾選今日到場客人</h3>
+        <div style="margin-bottom: 10px;">
+            <button class="secondary" onclick="toggleSelectAll(true)">全部勾選</button>
+            <button class="secondary" onclick="toggleSelectAll(false)">全部取消</button>
+        </div>
+        <div id="attendanceContainer" class="checkbox-group">
+            <!-- 動態產生勾選清單 -->
+        </div>
+        <button onclick="generateTables()" style="width: 100%; font-size: 18px; padding: 12px;">🚀 開始智慧自動排桌</button>
     </div>
 
-    <div class="card">
-        <h3>2. 設定互斥名單（誰不能跟誰同桌）</h3>
-        <label for="conflicts">格式：「人名: 不能同桌的人1, 不能同桌的人2」（不需寫底台）：</label>
-        <textarea id="conflicts" placeholder="例如：
-小明: 小華, 大強
-美美: 阿傑"></textarea>
-        <div class="save-tip">💡 提示：互斥名單會自動儲存在這個瀏覽器中！</div>
-    </div>
-
-    <div class="btn-group">
-        <button onclick="generateTables()">開始依底台智慧排桌</button>
-        <button class="secondary" onclick="saveDataManually()">手動儲存設定</button>
-    </div>
-
+    <!-- 排桌結果區 -->
     <div id="output"></div>
 
+    <!-- 客人資料庫管理區 -->
+    <div class="card">
+        <h3>2. 客人資料庫管理（新增 / 編輯）</h3>
+        <form id="customerForm" onsubmit="saveCustomer(event)">
+            <input type="hidden" id="editIndex" value="-1">
+            <label>客人姓名：</label>
+            <input type="text" id="custName" placeholder="例如：小明" required>
+
+            <label>可打底台（可複選）：</label>
+            <div style="margin-bottom: 10px;">
+                <label style="font-weight: normal; margin-right: 15px;"><input type="checkbox" id="rate51" value="5/1" checked> 5/1</label>
+                <label style="font-weight: normal;"><input type="checkbox" id="rate35" value="3/5" checked> 3/5</label>
+            </div>
+
+            <label>不能同桌的人（用逗號隔開）：</label>
+            <input type="text" id="custEnemies" placeholder="例如：小華, 大強">
+
+            <div class="btn-group">
+                <button type="submit" id="submitBtn">➕ 新增客人</button>
+                <button type="button" class="secondary" onclick="resetForm()">取消編輯</button>
+            </div>
+        </form>
+
+        <h4 style="margin-top: 20px;">📋 已建立的客人名單：</h4>
+        <table class="customer-table">
+            <thead>
+                <tr>
+                    <th>姓名</th>
+                    <th>可打底台</th>
+                    <th>不能同桌對象</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="customerTableBody">
+                <!-- 動態顯示表格 -->
+            </tbody>
+        </table>
+    </div>
+
     <script>
+        // 預設示範資料
+        let defaultCustomers = [
+            { name: "小明", rates: ["5/1"], enemies: ["小華", "大強"] },
+            { name: "小華", rates: ["5/1"], enemies: ["小明"] },
+            { name: "大強", rates: ["5/1"], enemies: ["小明"] },
+            { name: "美美", rates: ["5/1"], enemies: ["阿傑"] },
+            { name: "阿傑", rates: ["3/5"], enemies: ["美美"] },
+            { name: "志明", rates: ["3/5"], enemies: [] },
+            { name: "春嬌", rates: ["3/5"], enemies: [] },
+            { name: "麗華", rates: ["3/5"], enemies: [] },
+            { name: "大寶", rates: ["5/1", "3/5"], enemies: [] },
+            { name: "小美", rates: ["5/1", "3/5"], enemies: [] }
+        ];
+
+        let customers = [];
+
         window.onload = function() {
-            const savedConflicts = localStorage.getItem('mahjong_conflicts');
-            if (savedConflicts) document.getElementById('conflicts').value = savedConflicts;
-            const savedPlayers = localStorage.getItem('mahjong_players');
-            if (savedPlayers) document.getElementById('players').value = savedPlayers;
+            const saved = localStorage.getItem('mahjong_customers_db');
+            if (saved) {
+                customers = JSON.parse(saved);
+            } else {
+                customers = defaultCustomers;
+                saveCustomersToStorage();
+            }
+            renderAttendanceList();
+            renderCustomerTable();
         };
 
-        function saveDataManually() {
-            localStorage.setItem('mahjong_conflicts', document.getElementById('conflicts').value);
-            localStorage.setItem('mahjong_players', document.getElementById('players').value);
-            alert('✅ 設定已成功儲存！');
+        function saveCustomersToStorage() {
+            localStorage.setItem('mahjong_customers_db', JSON.stringify(customers));
         }
 
-        parseConflicts = function(text) {
-            const conflictMap = {};
-            const lines = text.split('\n');
-            for (let line of lines) {
-                if (!line.trim()) continue;
-                const parts = line.split(':');
-                if (parts.length < 2) continue;
-                const person = parts[0].trim();
-                const enemies = parts[1].split(/[,，]/).map(s => s.trim()).filter(s => s);
-                
-                if (!conflictMap[person]) conflictMap[person] = new Set();
-                enemies.forEach(enemy => {
-                    conflictMap[person].add(enemy);
-                    if (!conflictMap[enemy]) conflictMap[enemy] = new Set();
-                    conflictMap[enemy].add(person);
-                });
+        // 渲染今日勾選區
+        function renderAttendanceList() {
+            const container = document.getElementById('attendanceContainer');
+            container.innerHTML = '';
+            if (customers.length === 0) {
+                container.innerHTML = '<span style="color: #888;">尚未建立客人資料，請至下方建立。</span>';
+                return;
             }
+            customers.forEach((cust, index) => {
+                const label = document.createElement('label');
+                label.className = 'player-checkbox';
+                const rateText = cust.rates.join('/');
+                label.innerHTML = `
+                    <input type="checkbox" class="attend-cb" value="${cust.name}" checked>
+                    <strong>${cust.name}</strong>
+                    <span class="tag">${rateText}</span>
+                `;
+                container.appendChild(label);
+            });
+        }
+
+        function toggleSelectAll(select) {
+            document.querySelectorAll('.attend-cb').forEach(cb => cb.checked = select);
+        }
+
+        // 渲染客人資料表
+        function renderCustomerTable() {
+            const tbody = document.getElementById('customerTableBody');
+            tbody.innerHTML = '';
+            customers.forEach((cust, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${cust.name}</strong></td>
+                    <td>${cust.rates.join(', ')}</td>
+                    <td>${cust.enemies.length > 0 ? cust.enemies.join(', ') : '無'}</td>
+                    <td>
+                        <button class="secondary" onclick="editCustomer(${index})" style="padding: 3px 8px; font-size:12px;">編輯</button>
+                        <button class="danger" onclick="deleteCustomer(${index})">刪除</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function saveCustomer(e) {
+            e.preventDefault();
+            const name = document.getElementById('custName').value.trim();
+            const rates = [];
+            if (document.getElementById('rate51').checked) rates.push('5/1');
+            if (document.getElementById('rate35').checked) rates.push('3/5');
+
+            if (rates.length === 0) {
+                alert('請至少選擇一種可打底台！');
+                return;
+            }
+
+            const enemiesStr = document.getElementById('custEnemies').value.trim();
+            const enemies = enemiesStr ? enemiesStr.split(/[,，]/).map(s => s.trim()).filter(s => s) : [];
+
+            const editIndex = parseInt(document.getElementById('editIndex').value);
+            if (editIndex >= 0) {
+                customers[editIndex] = { name, rates, enemies };
+            } else {
+                customers.push({ name, rates, enemies });
+            }
+
+            saveCustomersToStorage();
+            resetForm();
+            renderAttendanceList();
+            renderCustomerTable();
+        }
+
+        function editCustomer(index) {
+            const cust = customers[index];
+            document.getElementById('custName').value = cust.name;
+            document.getElementById('rate51').checked = cust.rates.includes('5/1');
+            document.getElementById('rate35').checked = cust.rates.includes('3/5');
+            document.getElementById('custEnemies').value = cust.enemies.join(', ');
+            document.getElementById('editIndex').value = index;
+            document.getElementById('submitBtn').innerText = '💾 儲存修改';
+        }
+
+        function deleteCustomer(index) {
+            if (confirm(`確定要刪除客人「${customers[index].name}」嗎？`)) {
+                customers.splice(index, 1);
+                saveCustomersToStorage();
+                renderAttendanceList();
+                renderCustomerTable();
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('customerForm').reset();
+            document.getElementById('editIndex').value = -1;
+            document.getElementById('submitBtn').innerText = '➕ 新增客人';
+        }
+
+        // 排桌核心演算法
+        function parseConflictMap(attendedCusts) {
+            const conflictMap = {};
+            attendedCusts.forEach(c => {
+                if (!conflictMap[c.name]) conflictMap[c.name] = new Set();
+                c.enemies.forEach(enemy => {
+                    conflictMap[c.name].add(enemy);
+                    if (!conflictMap[enemy]) conflictMap[enemy] = new Set();
+                    conflictMap[enemy].add(c.name);
+                });
+            });
             return conflictMap;
         }
 
@@ -192,11 +348,9 @@
         }
 
         function evaluateAllocation(tables, conflictMap) {
-            let totalConflicts = 0;
-            tables.forEach(table => {
-                totalConflicts += getTableConflicts(table, conflictMap).count;
-            });
-            return totalConflicts;
+            let total = 0;
+            tables.forEach(t => total += getTableConflicts(t, conflictMap).count);
+            return total;
         }
 
         function getCombinations(arr, k) {
@@ -204,9 +358,7 @@
             if (arr.length === 0) return [];
             const head = arr[0];
             const tail = arr.slice(1);
-            const withHead = getCombinations(tail, k - 1).map(c => [head, ...c]);
-            const withoutHead = getCombinations(tail, k);
-            return [...withHead, ...withoutHead];
+            return [...getCombinations(tail, k - 1).map(c => [head, ...c]), ...getCombinations(tail, k)];
         }
 
         function findBestAllocation(players, conflictMap) {
@@ -230,10 +382,9 @@
 
                 const first = currentPlayers[0];
                 const rest = currentPlayers.slice(1);
-                const combos = getCombinations(rest, 3);
-                const limitCombos = combos.slice(0, 30);
+                const combos = getCombinations(rest, 3).slice(0, 30);
 
-                for (let combo of limitCombos) {
+                for (let combo of combos) {
                     const table = [first, ...combo];
                     const nextRemaining = rest.filter(p => !combo.includes(p));
                     search(nextRemaining, [...currentTables, table], depth + 1);
@@ -246,68 +397,28 @@
         }
 
         function generateTables() {
-            const playersText = document.getElementById('players').value;
-            const conflictsText = document.getElementById('conflicts').value;
+            // 抓出有勾選出席的人
+            const checkedNames = Array.from(document.querySelectorAll('.attend-cb:checked')).map(cb => cb.value);
+            const attendedCusts = customers.filter(c => checkedNames.includes(c.name));
 
-            localStorage.setItem('mahjong_conflicts', conflictsText);
-            localStorage.setItem('mahjong_players', playersText);
-
-            // 解析名單與底台分類
-            const rawInputs = playersText.split(/[,，\s\n]+/).filter(s => s);
-            const categories = {}; // { "5/1": ["小明", "小華"...], "3/5": [...] }
-
-            rawInputs.forEach(item => {
-                // 檢查是否有中括號，例如：小明 [5/1]
-                const match = item.match(/(.+)\s*\[(.+)\]/);
-                let name, cat;
-                if (match) {
-                    name = match[1].trim();
-                    cat = match[2].trim();
-                } else {
-                    name = item.trim();
-                    cat = "一般/未分類";
-                }
-
-                if (!categories[cat]) categories[cat] = [];
-                if (!categories[cat].includes(name)) categories[cat].push(name);
-            });
-
-            const conflictMap = parseConflicts(conflictsText);
-            const outputDiv = document.getElementById('output');
-
-            let totalHtml = `<div class="result-box"><h3>🎉 各底台排桌結果：</h3>`;
-            let hasValidGroup = false;
-
-            // 針對每一個底台分組進行排桌計算
-            for (let cat in categories) {
-                let groupPlayers = categories[cat];
-                let result = findBestAllocation(groupPlayers, conflictMap);
-
-                totalHtml += `<div class="category-title">🀄 ${cat} 場（共 ${groupPlayers.length} 人）</div>`;
-
-                if (result.tables.length > 0) {
-                    hasValidGroup = true;
-                    result.tables.forEach((table, index) => {
-                        const check = getTableConflicts(table, conflictMap);
-                        totalHtml += `<div class="table-card">
-                            <strong>第 ${index + 1} 桌：</strong> ${table.join(', ')}`;
-                        if (check.count > 0) {
-                            totalHtml += `<div class="conflict-tag">⚠️ 衝突注意：${check.details.join('、')} 同桌</div>`;
-                        }
-                        totalHtml += `</div>`;
-                    });
-                } else {
-                    totalHtml += `<div class="table-card" style="color: #7f8c8d;">人數不足 4 人，無法湊成一桌。</div>`;
-                }
-
-                if (result.rest.length > 0) {
-                    totalHtml += `<div style="margin-top: 5px; margin-bottom: 10px; color: #c0392b; font-size: 14px;"><strong>本組候補人員：</strong> ${result.rest.join(', ')}</div>`;
-                }
+            if (attendedCusts.length < 4) {
+                document.getElementById('output').innerHTML = `<div class="card" style="color: #e67e22;"><strong>人數不足：</strong> 今天勾選的人數少於 4 人，無法湊成一桌！</div>`;
+                return;
             }
 
-            totalHtml += `</div>`;
-            outputDiv.innerHTML = totalHtml;
-        }
-    </script>
-</body>
-</html>
+            const conflictMap = parseConflictMap(attendedCusts);
+
+            // 分分類：5/1專屬、3/5專屬、兩者皆可(彈性)
+            const fixed51 = [];
+            const fixed35 = [];
+            const flexPlayers = [];
+
+            attendedCusts.forEach(c => {
+                if (c.rates.includes('5/1') && c.rates.includes('3/5')) {
+                    flexPlayers.push(c.name);
+                } else if (c.rates.includes('5/1')) {
+                    fixed51.push(c.name);
+                } else if (c.rates.includes('3/5')) {
+                    fixed35.push(c.name);
+                }
+            });
