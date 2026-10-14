@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>麻將排桌智慧小幫手</title>
+    <title>麻將排桌智慧小幫手（含底台分類）</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -84,6 +84,15 @@
             margin-bottom: 10px;
             border-radius: 4px;
         }
+        .category-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2980b9;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            border-bottom: 2px solid #2980b9;
+            padding-bottom: 5px;
+        }
         .conflict-tag {
             color: #c0392b;
             font-size: 13px;
@@ -95,21 +104,30 @@
             color: #e67e22;
             margin-top: 5px;
         }
+        .format-tip {
+            font-size: 13px;
+            color: #666;
+            margin-top: 5px;
+            line-height: 1.4;
+        }
     </style>
 </head>
 <body>
 
-    <h1>🀄 麻將排桌智慧小幫手</h1>
+    <h1>🀄 麻將排桌智慧小幫手（底台分類版）</h1>
 
     <div class="card">
-        <h3>1. 輸入今日出席名單</h3>
-        <label for="players">請輸入今天來的客人名字（用逗號、空格或換行隔開）：</label>
-        <textarea id="players" placeholder="例如：小明, 小華, 大強, 美美, 阿傑, 志明, 春嬌, 麗華">小明, 小華, 大強, 美美, 阿傑, 志明, 春嬌, 麗華</textarea>
+        <h3>1. 輸入今日出席名單與底台</h3>
+        <label for="players">請輸入今天來的客人名字（格式：名字 [底台]，用逗號或換行隔開）：</label>
+        <textarea id="players" placeholder="例如：
+小明 [5/1], 小華 [5/1], 大強 [5/1], 美美 [5/1], 
+阿傑 [3/5], 志明 [3/5], 春嬌 [3/5], 麗華 [3/5]">小明 [5/1], 小華 [5/1], 大強 [5/1], 美美 [5/1], 阿傑 [3/5], 志明 [3/5], 春嬌 [3/5], 麗華 [3/5]</textarea>
+        <div class="format-tip">💡 提示：在名字後面加上中括號如 <code>[5/1]</code> 或 <code>[3/5]</code>，系統就會自動分組排桌！沒寫括號的人會被歸類在「一般/預設」組。</div>
     </div>
 
     <div class="card">
         <h3>2. 設定互斥名單（誰不能跟誰同桌）</h3>
-        <label for="conflicts">格式：「人名: 不能同桌的人1, 不能同桌的人2」（一行代表一組設定）：</label>
+        <label for="conflicts">格式：「人名: 不能同桌的人1, 不能同桌的人2」（不需寫底台）：</label>
         <textarea id="conflicts" placeholder="例如：
 小明: 小華, 大強
 美美: 阿傑"></textarea>
@@ -117,7 +135,7 @@
     </div>
 
     <div class="btn-group">
-        <button onclick="generateTables()">開始智慧排桌</button>
+        <button onclick="generateTables()">開始依底台智慧排桌</button>
         <button class="secondary" onclick="saveDataManually()">手動儲存設定</button>
     </div>
 
@@ -137,7 +155,7 @@
             alert('✅ 設定已成功儲存！');
         }
 
-        function parseConflicts(text) {
+        parseConflicts = function(text) {
             const conflictMap = {};
             const lines = text.split('\n');
             for (let line of lines) {
@@ -157,7 +175,6 @@
             return conflictMap;
         }
 
-        // 計算單桌內的衝突次數與細節
         function getTableConflicts(table, conflictMap) {
             let count = 0;
             let details = [];
@@ -174,7 +191,6 @@
             return { count, details };
         }
 
-        // 計算整組分桌方案的總衝突分（越低越好）
         function evaluateAllocation(tables, conflictMap) {
             let totalConflicts = 0;
             tables.forEach(table => {
@@ -193,7 +209,6 @@
             return [...withHead, ...withoutHead];
         }
 
-        // 尋找最佳分桌（優先找 0 衝突，找不到則找衝突最少的方案）
         function findBestAllocation(players, conflictMap) {
             let numTables = Math.floor(players.length / 4);
             if (numTables === 0) return { tables: [], rest: players, score: 999 };
@@ -202,7 +217,6 @@
             let bestRest = [];
             let minConflicts = 9999;
 
-            // 隨機抽樣或窮舉組合來尋找最佳解
             function search(currentPlayers, currentTables, depth) {
                 if (depth === numTables || currentPlayers.length < 4) {
                     let score = evaluateAllocation(currentTables, conflictMap);
@@ -217,14 +231,13 @@
                 const first = currentPlayers[0];
                 const rest = currentPlayers.slice(1);
                 const combos = getCombinations(rest, 3);
-
-                // 為了效能，限制最多檢查前 30 種組合
                 const limitCombos = combos.slice(0, 30);
+
                 for (let combo of limitCombos) {
                     const table = [first, ...combo];
                     const nextRemaining = rest.filter(p => !combo.includes(p));
                     search(nextRemaining, [...currentTables, table], depth + 1);
-                    if (minConflicts === 0) break; // 找到完美解直接收工
+                    if (minConflicts === 0) break;
                 }
             }
 
@@ -239,41 +252,61 @@
             localStorage.setItem('mahjong_conflicts', conflictsText);
             localStorage.setItem('mahjong_players', playersText);
 
-            const players = playersText.split(/[,，\s\n]+/).map(s => s.trim()).filter(s => s);
-            const uniquePlayers = [...new Set(players)];
-            const outputDiv = document.getElementById('output');
+            // 解析名單與底台分類
+            const rawInputs = playersText.split(/[,，\s\n]+/).filter(s => s);
+            const categories = {}; // { "5/1": ["小明", "小華"...], "3/5": [...] }
 
-            if (uniquePlayers.length < 4) {
-                outputDiv.innerHTML = `<div class="warning-box"><strong>人數不足：</strong> 至少需要 4 個人才能排桌！</div>`;
-                return;
-            }
-
-            const conflictMap = parseConflicts(conflictsText);
-            const result = findBestAllocation(uniquePlayers, conflictMap);
-
-            let html = '';
-            if (result.score === 0) {
-                html += `<div class="result-box"><h3>🎉 完美排桌完成（完全無衝突）！</h3>`;
-            } else {
-                html += `<div class="warning-box"><h3>⚠️ 已找出最佳排法（但有 ${result.score} 個無法避免的衝突）：</h3>`;
-            }
-
-            result.tables.forEach((table, index) => {
-                const check = getTableConflicts(table, conflictMap);
-                html += `<div class="table-card">
-                    <strong>第 ${index + 1} 桌：</strong> ${table.join(', ')}`;
-                if (check.count > 0) {
-                    html += `<div class="conflict-tag">⚠️ 衝突注意：${check.details.join('、')} 同桌</div>`;
+            rawInputs.forEach(item => {
+                // 檢查是否有中括號，例如：小明 [5/1]
+                const match = item.match(/(.+)\s*\[(.+)\]/);
+                let name, cat;
+                if (match) {
+                    name = match[1].trim();
+                    cat = match[2].trim();
+                } else {
+                    name = item.trim();
+                    cat = "一般/未分類";
                 }
-                html += `</div>`;
+
+                if (!categories[cat]) categories[cat] = [];
+                if (!categories[cat].includes(name)) categories[cat].push(name);
             });
 
-            if (result.rest.length > 0) {
-                html += `<div style="margin-top: 10px; color: #c0392b;"><strong>本輪落單/候補人員：</strong> ${result.rest.join(', ')}</div>`;
+            const conflictMap = parseConflicts(conflictsText);
+            const outputDiv = document.getElementById('output');
+
+            let totalHtml = `<div class="result-box"><h3>🎉 各底台排桌結果：</h3>`;
+            let hasValidGroup = false;
+
+            // 針對每一個底台分組進行排桌計算
+            for (let cat in categories) {
+                let groupPlayers = categories[cat];
+                let result = findBestAllocation(groupPlayers, conflictMap);
+
+                totalHtml += `<div class="category-title">🀄 ${cat} 場（共 ${groupPlayers.length} 人）</div>`;
+
+                if (result.tables.length > 0) {
+                    hasValidGroup = true;
+                    result.tables.forEach((table, index) => {
+                        const check = getTableConflicts(table, conflictMap);
+                        totalHtml += `<div class="table-card">
+                            <strong>第 ${index + 1} 桌：</strong> ${table.join(', ')}`;
+                        if (check.count > 0) {
+                            totalHtml += `<div class="conflict-tag">⚠️ 衝突注意：${check.details.join('、')} 同桌</div>`;
+                        }
+                        totalHtml += `</div>`;
+                    });
+                } else {
+                    totalHtml += `<div class="table-card" style="color: #7f8c8d;">人數不足 4 人，無法湊成一桌。</div>`;
+                }
+
+                if (result.rest.length > 0) {
+                    totalHtml += `<div style="margin-top: 5px; margin-bottom: 10px; color: #c0392b; font-size: 14px;"><strong>本組候補人員：</strong> ${result.rest.join(', ')}</div>`;
+                }
             }
 
-            html += `</div>`;
-            outputDiv.innerHTML = html;
+            totalHtml += `</div>`;
+            outputDiv.innerHTML = totalHtml;
         }
     </script>
 </body>
