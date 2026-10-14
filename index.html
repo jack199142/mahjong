@@ -49,7 +49,7 @@
             margin-bottom: 12px;
             border: 1px solid #ddd;
             border-radius: 8px;
-            font-size: 16px; /* 防止 iOS 放大畫面 */
+            font-size: 16px;
             background: #fafafa;
         }
         .checkbox-group {
@@ -470,4 +470,32 @@
 
                 if (result.tables.length > 0) {
                     result.tables.forEach((table, index) => {
-                        const cleanTable = table.map(p => p
+                        const cleanTable = table.map(p => p.replace(" (彈性)", " 🌟"));
+                        const check = getTableConflicts(table, conflictMap);
+                        totalHtml += `<div class="table-card">
+                            <strong>第 ${index + 1} 桌：</strong> ${cleanTable.join(', ')}`;
+                        if (check.count > 0) {
+                            totalHtml += `<div class="conflict-tag">⚠️ 衝突注意：${check.details.map(d => d.replace(" (彈性)", "")).join('、')}</div>`;
+                        }
+                        totalHtml += `</div>`;
+                    });
+                } else {
+                    totalHtml += `<div class="table-card" style="color: #7f8c8d; font-size:13px;">人數不足 4 人，無法湊成一桌。</div>`;
+                }
+
+                if (result.rest.length > 0) {
+                    const cleanRest = result.rest.map(p => p.replace(" (彈性)", " 🌟"));
+                    totalHtml += `<div style="margin: 6px 0 10px 0; color: #c0392b; font-size: 13px;"><strong>本組候補：</strong> ${cleanRest.join(', ')}</div>`;
+                }
+            }
+
+            totalHtml += `<div style="font-size: 11px; color: #666; margin-top: 10px; line-height:1.4;">💡 標記 🌟 代表他是雙打（彈性）支援該場次的客人。</div>`;
+            totalHtml += `</div>`;
+            
+            const outputDiv = document.getElementById('output');
+            outputDiv.innerHTML = totalHtml;
+            outputDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
