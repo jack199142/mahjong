@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>麻將排桌避開小幫手（自動記憶版）</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f6f9;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            height: 100px;
+            resize: vertical;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        button {
+            flex: 1;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #219653;
+        }
+        button.secondary {
+            background-color: #7f8c8d;
+        }
+        button.secondary:hover {
+            background-color: #707b7c;
+        }
+        .result-box {
+            background: #e8f8f5;
+            border-left: 5px solid #27ae60;
+            padding: 15px;
+            margin-top: 15px;
+            border-radius: 0 4px 4px 0;
+        }
+        .error-box {
+            background: #fdebd0;
+            border-left: 5px solid #e67e22;
+            padding: 15px;
+            margin-top: 15px;
+            border-radius: 0 4px 4px 0;
+        }
+        .table-card {
+            background: #fff;
+            border: 1px solid #ddd;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        .save-tip {
+            font-size: 12px;
+            color: #e67e22;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🀄 麻將排桌避開小幫手</h1>
+
+    <div class="card">
+        <h3>1. 輸入今日出席名單</h3>
+        <label for="players">請輸入今天來的客人名字（用逗號、空格或換行隔開）：</label>
+        <textarea id="players" placeholder="例如：小明, 小華, 大強, 美美, 阿傑, 志明, 春嬌, 麗華">小明, 小華, 大強, 美美, 阿傑, 志明, 春嬌, 麗華</textarea>
+    </div>
+
+    <div class="card">
+        <h3>2. 設定互斥名單（誰不能跟誰同桌）</h3>
+        <label for="conflicts">格式：「人名: 不能同桌的人1, 不能同桌的人2」（一行代表一組設定）：</label>
+        <textarea id="conflicts" placeholder="例如：
+小明: 小華, 大強
+美美: 阿傑"></textarea>
+        <div class="save-tip">💡 提示：互斥名單會自動儲存在這個瀏覽器中，下次打開不用重新輸入！</div>
+    </div>
+
+    <div class="btn-group">
+        <button onclick="generateTables()">開始自動排桌</button>
+        <button class="secondary" onclick="saveDataManually()">手動儲存設定</button>
+    </div>
+
+    <div id="output"></div>
+
+    <script>
+        window.onload = function() {
+            const savedConflicts = localStorage.getItem('mahjong_conflicts');
+            if (savedConflicts) {
+                document.getElementById('conflicts').value = savedConflicts;
+            }
+            const savedPlayers = localStorage.getItem('mahjong_players');
+            if (savedPlayers) {
+                document.getElementById('players').value = savedPlayers;
+            }
+        };
+
+        function saveDataManually() {
+            const conflictsText = document.getElementById('conflicts').value;
+            const playersText = document.getElementById('players').value;
+            localStorage.setItem('mahjong_conflicts', conflictsText);
+            localStorage.setItem('mahjong_players', playersText);
+            alert('✅ 互斥名單與出席名單已成功儲存！');
+        }
+
+        function parseConflicts(text) {
+            const conflictMap = {};
+            const lines = text.split('\n');
+            for (let line of lines) {
+                if (!line.trim()) continue;
+                const parts = line.split(':');
+                if (parts.length < 2) continue;
+                const person = parts[0].trim();
+                const enemies = parts[1].split(/[,，]/).map(s => s.trim()).filter(s => s);
+                
+                if (!conflictMap[person]) conflictMap[person] = new Set();
+                enemies.forEach(enemy => {
+                    conflictMap[person].add(enemy);
+                    if (!conflictMap[enemy]) conflictMap[enemy] = new Set();
+                    conflictMap[enemy].add(person);
+                });
+            }
+            return conflictMap;
+        }
+
+        function isValidTable(table, conflictMap) {
+            for (let i = 0; i < table.length; i++) {
+                for (let j = i + 1; j < table.length; j++) {
+                    const p1 = table[i];
+                    const p2 = table[j];
+                    if (conflictMap[p1] && conflictMap[p1].has(p2)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function findCombination(remainingPlayers, currentTables, conflictMap) {
+            if (remainingPlayers.length === 0) {
+                return currentTables;
+            }
+            if (remainingPlayers.length < 4) {
+                return null; 
+            }
+
+            const first = remainingPlayers[0];
+            const rest = remainingPlayers.slice(1);
+            const combinations = getCombinations(rest, 3);
+            
+            for (let combo of combinations) {
+                const table = [first, ...combo];
+                if (isValidTable(table, conflictMap)) {
+                    const nextRemaining = rest.filter(p => !combo.includes(p));
+                    const result = findCombination(nextRemaining, [...currentTables, table], conflictMap);
+                    if (result) return result;
+                }
+            }
+            return null;
+        }
+
+        function getCombinations(arr, k) {
+            if (k === 0) return [[]];
+            if (arr.length === 0) return [];
+            const head = arr[0];
+            const tail = arr.slice(1);
+            const withHead = getCombinations(tail, k - 1).map(c => [head, ...c]);
+            const withoutHead = getCombinations(tail, k);
+            return [...withHead, ...withoutHead];
+        }
+
+        function generateTables() {
+            const playersText = document.getElementById('players').value;
+            const conflictsText = document.getElementById('conflicts').value;
+
+            localStorage.setItem('mahjong_conflicts', conflictsText);
+            localStorage.setItem('mahjong_players', playersText);
+
+            const players = playersText.split(/[,，\s\n]+/).map(s => s.trim()).filter(s => s);
+            const uniquePlayers = [...new Set(players)];
+
+            const outputDiv = document.getElementById('output');
+
+            if (uniquePlayers.length < 4) {
+                outputDiv.innerHTML = `
+                    <div class="error-box">
+                        <strong>人數不足：</strong> 至少需要 4 個人才能湊成一桌！
+                    </div>
+                `;
+                return;
+            }
+
+            const conflictMap = parseConflicts(conflictsText);
+            const resultTables = findCombination(uniquePlayers, [], conflictMap);
+
+            if (resultTables && resultTables.length > 0) {
+                let html = `<div class="result-box"><h3>🎉 成功安排以下牌桌：</h3>`;
+                resultTables.forEach((table, index) => {
+                    html += `<div class="table-card"><strong>第 ${index + 1} 桌：</strong> ${table.join(', ')}</div>`;
+                });
+                
+                const seatedPlayers = resultTables.flat();
+                const restPlayers = uniquePlayers.filter(p => !seatedPlayers.includes(p));
+                if (restPlayers.length > 0) {
+                    html += `<div style="margin-top: 10px; color: #c0392b;"><strong>本輪落單/候補人員：</strong> ${restPlayers.join(', ')}</div>`;
+                }
+
+                html += `</div>`;
+                outputDiv.innerHTML = html;
+            } else {
+                outputDiv.innerHTML = `
+                    <div class="error-box">
+                        <strong>無法排出符合條件的組合！</strong> 可能是互斥條件太嚴格，導致彼此衝突。請嘗試調整或放寬部分避開名單。
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
